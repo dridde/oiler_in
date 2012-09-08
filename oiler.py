@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding:Utf-8 -*-
-import sys, socket, string, time, datetime, urllib, re, random, tweepy, threading
+import sys, socket, string, time, datetime, urllib, re, random, tweepy, threading, config
 
 # MetaKram
 
@@ -221,18 +221,53 @@ def delQuote(line):
 
 # twitter kram
 def tweetIt(line):
+	global veto
+	global vetorunning
 	if (isQuery(line) == False):
 		try:
 			message = ' '.join(line[4:])
 			if (len(message) > 140):
 				sendpriv(line, "Ähem. Der Text ist zu lang.", irc)
 			else:
-				api.update_status(message)
-				sendpriv(line, "Tweet ist raus.", irc)
+				if (vetorunning == True):
+					sendpriv(line, "Äh, warte kurz!", irc)
+				else:
+					vetorunning = True
+					veto = False
+					tweetThread = threading.Thread(target=sendTweet, args=(message,))
+					tweetThread.start()
 		except: 
 			sendpriv(line, "Ohne Worte...", irc)	
 	else:
 		sendpriv(line, "Musst schon öffentlich twittern ;)", irc)
+		
+def tweetVeto(line):
+	global veto
+	global vetorunning
+	if (isQuery(line) == False):
+		if (vetorunning == True):
+			if (veto == False):
+				veto = True
+				sendpriv(line, "Anzeige ist raus!", irc)
+		else:
+			sendpriv(line, "läuft doch gar nischt", irc)
+	else:
+		sendpriv(line, "Musst schon öffentlich veto einlegen ;)", irc)
+		
+def sendTweet(message):
+	global veto
+	global vetorunning
+	sendpriv(line, "10 Sekunden Vetophase läuft.", irc)
+	time.sleep(10)
+	vetorunning = False
+	try:
+		if (veto == False):
+			api.update_status(message)
+			sendpriv(line, "Tweet ist raus.", irc)
+	except:
+		sendpriv(line, "das hat nicht geklappt", irc)
+	veto = False
+	
 # ende twitter kram
 
 
@@ -266,8 +301,11 @@ def cmd(command, line):
 			now = datetime.datetime.now()
 			sendpriv(line, now.strftime("%Y-%m-%d %H:%M"), irc)
 			
-		elif (command == "!tweet"):
+		elif ((command == "!tweet") | (command == "!twitter")):
 			tweetIt(line)
+			
+		elif (command == "!veto"):
+			tweetVeto(line)
 		
 		elif (command == "!info"):
 			sendpriv(line, "Quote(s) durch " + nick +"!", irc)
@@ -283,7 +321,8 @@ def cmd(command, line):
 			sendpriv(line, "!delquote <nummer> -  Zitat löschen", irc)
 			sendpriv(line, "!ignore <nickname> <channel> <password> - Nur im Query. Nutzer von Botbenutzung ausschließen bzw wieder zulassen", irc)
 			sendpriv(line, "!time - Systemzeit ausgeben", irc)
-			sendpriv(line, "!tweet <Text> - sendet den String mit dem #nodrama.de Account direkt an Twitter", irc)
+			sendpriv(line, "!tweet oder !twitter <Text> - sendet den String mit dem #nodrama.de Account direkt an Twitter", irc)
+			sendpriv(line, "!veto - stoppt den aktuellen tweet", irc)
 		
 		elif (command == "!ignore"):
 			if (checkQueryPW(line, 6) == True):
@@ -308,17 +347,22 @@ def cmd(command, line):
 
 # main-loop
 
-network = ""
-port = 6667
-nick = ""
-chan = ""
-buffer = ""
-ownerpw = ""
+network = config.network
+port = config.port
+nick = config.nick
+chan = config.chan
+ownerpw = config.ownerpw
 
-consumer_key=""
-consumer_secret=""
-access_token=""
-access_token_secret=""
+consumer_key=config.consumer_key
+consumer_secret=config.consumer_secret
+access_token=config.access_token
+access_token_secret=config.access_token_secret
+
+buffer = ""
+
+#globaler vetofoo
+vetorunning = False
+veto = False
 
 auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret)
