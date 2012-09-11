@@ -55,6 +55,8 @@ def send(type, msg, irc):
 		irc.send("JOIN " + msg + "\r\n")
 	elif (type == "QUIT"):
 		irc.send("QUIT\r\n")
+	elif (type == "PART"):
+		irc.send("PART " + msg + "\r\n")
 	elif (type == "IDENT"):
 		irc.send("PRIVMSG NICKSERV :identify" + str(msg) + "\r\n")
 	else:
@@ -257,8 +259,8 @@ def tweetVeto(line):
 def sendTweet(message):
 	global veto
 	global vetorunning
-	sendpriv(line, "10 Sekunden Vetophase läuft.", irc)
-	time.sleep(10)
+	sendpriv(line, "15 Sekunden Vetophase läuft.", irc)
+	time.sleep(15)
 	vetorunning = False
 	try:
 		if (veto == False):
