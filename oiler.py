@@ -243,6 +243,28 @@ def tweetIt(line):
 	else:
 		sendpriv(line, "Musst schon öffentlich twittern ;)", irc)
 		
+def fav(line):
+	global veto
+	global vetorunning
+
+	if isQuery(line):
+		sendpriv(line, "Nich' auf die Privacy-Tour, Freundchen!", irc)
+		return
+
+	m = re.match(r"https?://(?:mobile.|www.)?twitter.com/[^/]+/status/(?P<status_id>\d+)", line[4])
+	if m is None:
+		sendpriv(line, "Ähem. Man kann nur Tweets faven. <erklaermaedchen.jpg>", irc)
+	else:
+		if (vetorunning == True):
+			sendpriv(line, "Äh, warte kurz!", irc)
+		else:
+			status_id = m.group('status_id')
+			vetorunning = True
+			veto = False
+			tweetThread = threading.Thread(target=sendFav, args=(status_id,))
+			tweetThread.daemon = True
+			tweetThread.start()
+
 def tweetVeto(line):
 	global veto
 	global vetorunning
@@ -270,6 +292,17 @@ def sendTweet(message):
 		sendpriv(line, "das hat nicht geklappt", irc)
 	veto = False
 	
+def sendFav(status_id):
+	global veto
+	global vetorunning
+	sendpriv(line, "%d Sekunden Vetophase läuft." % (vetotime,), irc)
+	time.sleep(vetotime)
+	vetorunning = False
+	if (veto == False):
+		api.create_favorite(status_id)
+		sendpriv(line, "Das wäre erledigt.", irc)
+	veto = False
+
 # ende twitter kram
 
 
@@ -306,6 +339,9 @@ def cmd(command, line):
 		elif ((command == "!tweet") | (command == "!twitter")):
 			tweetIt(line)
 			
+		elif command == "!fav":
+			fav(line)
+
 		elif (command == "!veto"):
 			tweetVeto(line)
 		
@@ -324,6 +360,7 @@ def cmd(command, line):
 			sendpriv(line, "!ignore <nickname> <channel> <password> - Nur im Query. Nutzer von Botbenutzung ausschließen bzw wieder zulassen", irc)
 			sendpriv(line, "!time - Systemzeit ausgeben", irc)
 			sendpriv(line, "!tweet oder !twitter <Text> - sendet den String mit dem #nodrama.de Account direkt an Twitter", irc)
+			sendpriv(line, "!fav <Twitter-URL> - favt den angegebenen Tweet mit dem #nodrama.de-Account", irc)
 			sendpriv(line, "!veto - stoppt den aktuellen tweet", irc)
 		
 		elif (command == "!ignore"):
