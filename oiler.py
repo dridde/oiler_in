@@ -356,9 +356,10 @@ def cmd(command, line):
 			sendpriv(line, "!delquote <nummer> -  Zitat löschen", irc)
 			sendpriv(line, "!ignore <nickname> <channel> <password> - Nur im Query. Nutzer von Botbenutzung ausschließen bzw wieder zulassen", irc)
 			sendpriv(line, "!time - Systemzeit ausgeben", irc)
-			sendpriv(line, "!tweet <Text> oder !twitter <Text> - sendet den String mit dem #nodrama.de Account direkt an Twitter", irc)
-			sendpriv(line, "!reply <Twitter-URL> <Text> - sendet ein @reply zum angegebenen Tweet vom #nodrama.de-Account", irc)
-			sendpriv(line, "!retweet <Twitter-URL> - retweetet den angegebenen Tweet mit dem #nodrama.de-Account", irc)
+			sendpriv(line, "!tweet <Text> oder !twitter <Text> - sendet den String mit dem " + config.twitter_account + "-Account direkt an Twitter", irc)
+			sendpriv(line, "!reply <Twitter-URL> <Text> - sendet ein @reply zum angegebenen Tweet vom " + config.twitter_account + "-Account", irc)
+			sendpriv(line, "!retweet <Twitter-URL> - retweetet den angegebenen Tweet mit dem " + config.twitter_account + "-Account", irc)
+			sendpriv(line, "!fav <Twitter-URL> - favt den angegebenen Tweet mit dem " + config.twitter_account + "-Account", irc)
 			sendpriv(line, "!veto - stoppt den aktuellen tweet", irc)
 		
 		elif (command == "!ignore"):
