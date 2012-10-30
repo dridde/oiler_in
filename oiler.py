@@ -1,53 +1,39 @@
 #!/usr/bin/env python
-# -*- coding:Utf-8 -*-
+# -*- coding:utf-8 -*-
+
 import sys, socket, string, time, datetime, urllib, re, random, tweepy, threading, config
 
 # MetaKram
 
 #Username der schreibt
 def getName(line, forIgnore = False):
-	try:
-		if (forIgnore == False):
-			return str( line[0][1:line[0].index("!")])
-		else:
-			return str(line[4])
-	except:
-		return -1
+	if (forIgnore == False):
+		return str( line[0][1:line[0].index("!")])
+	else:
+		return str(line[4])
 
 #Channel aus dem es kam
 def getChannel(line, forIgnore=False):
-	try:
-		if (forIgnore == False):
-			if (line[2] == nick):
-				return -1
-			else:
-				return str(line[2])
+	if (forIgnore == False):
+		if (line[2] == nick):
+			return -1
 		else:
-			if (line[2] == nick):
-				return str(line[5])
-	except:
-		return -1
+			return str(line[2])
+	else:
+		if (line[2] == nick):
+			return str(line[5])
 
 #Passwort fuer ignore
 def getPassword(line, position = 6):
-	try:
-		return str(line[position])
-	except:
-		return -1
+	return str(line[position])
 
 def isQuery(line):
-	try:
-		if (line[2] == nick):
-			return True
-		else:
-			return False
-	except:
-		return False
+	return (line[2] == nick)
 
 # sende kommandos
 def send(type, msg, irc):
 	if (type == "NICK"):
-		irc.send("Nick " + msg + "\r\n")
+		irc.send("NICK " + msg + "\r\n")
 		#nick = msg
 	elif (type == "USER"):
 		irc.send("USER " + nick + " " + nick + " " + nick + " :"+ nick + "\r\n")
@@ -371,7 +357,7 @@ auth.set_access_token(access_token, access_token_secret)
 
 api = tweepy.API(auth)
 
-irc = socket.socket( )
+irc = socket.socket()
 irc.connect((network, port))
 send("NICK", nick, irc)
 send("USER", "", irc)
@@ -381,45 +367,43 @@ send("JOIN", chan, irc)
 #start twitter lausche-thread
 def twitterLurk():
 	while 1:
-		try:
-			time.sleep(60)
-			mentions = api.mentions();
-			for status in mentions:
-				if (status.created_at > datetime.datetime.utcnow()-datetime.timedelta(minutes=1)):
-					irc.send("PRIVMSG " + chan + " :" + "Tweet von " + str("@" + status.author.screen_name) + ": " + str(status.text) + "\r\n")
-		except:
-			pass
+		time.sleep(60)
+		mentions = api.mentions();
+		for status in mentions:
+			if (status.created_at > datetime.datetime.utcnow()-datetime.timedelta(minutes=1)):
+				irc.send("PRIVMSG " + chan + " :" + "Tweet von " + str("@" + status.author.screen_name) + ": " + str(status.text) + "\r\n")
 
 t = threading.Thread(target=twitterLurk)
+t.daemon = True
 t.start()
 
 while 1:
 	try:
 		buffer = buffer + irc.recv(1024)
 		newlines = string.split(buffer, "\n")
-		buffer = newlines.pop( )
-		
-	except:
-		sys.exit()
-	
-	for line in newlines:
-		line = string.rstrip(line)
-		line = string.split(line)
-		#output = " ".join(line)
-		#print output
-		
-		
-		try:
-			if (line[3][1] == "!"):
-				cmd(line[3][1:], line)
-				
-		except(IndexError):
-			pass
-		
-		# send pong gemäß RFC 1459 falls angefordert
-		if (line[0] == "PING"):
-			irc.send("PONG %s\r\n" % line[1])
-		
-		# rejoin nach kick
-		if (line[1] == "KICK" and line[3] == nick):
-			send("JOIN", line[2], irc)
+		buffer = newlines.pop()
+			
+		for line in newlines:
+			line = string.rstrip(line)
+			line = string.split(line)
+
+			print ' '.join(line)
+			
+			try:
+				if (line[3][1] == "!"):
+					cmd(line[3][1:], line)
+					
+			except(IndexError):
+				pass
+			
+			# send pong gemäß RFC 1459 falls angefordert
+			if (line[0] == "PING"):
+				irc.send("PONG %s\r\n" % line[1])
+			
+			# rejoin nach kick
+			if (line[1] == "KICK" and line[3] == nick):
+				send("JOIN", line[2], irc)
+
+	except (KeyboardInterrupt, SystemExit):
+		print 'Caught interrupt, quitting.'
+		sys.exit(0)
