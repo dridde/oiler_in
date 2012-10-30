@@ -262,6 +262,28 @@ def retweet(line):
 			tweetThread.daemon = True
 			tweetThread.start()
 		
+def fav(line):
+	global veto
+	global vetorunning
+
+	if isQuery(line):
+		sendpriv(line, "Nich' auf die Privacy-Tour, Freundchen!", irc)
+		return
+
+	m = re.match(r"https?://(?:mobile.|www.)?twitter.com/[^/]+/status/(?P<status_id>\d+)", line[4])
+	if m is None:
+		sendpriv(line, "Ähem. Man kann nur Tweets faven. <erklaermaedchen.jpg>", irc)
+	else:
+		if (vetorunning == True):
+			sendpriv(line, "Äh, warte kurz!", irc)
+		else:
+			status_id = m.group('status_id')
+			vetorunning = True
+			veto = False
+			tweetThread = threading.Thread(target=sendFav, args=(status_id,))
+			tweetThread.daemon = True
+			tweetThread.start()
+		
 def tweetVeto(line):
 	global veto
 	global vetorunning
@@ -297,6 +319,17 @@ def sendRetweet(status_id):
 	vetorunning = False
 	if (veto == False):
 		api.retweet(status_id)
+		sendpriv(line, "Das wäre erledigt.", irc)
+	veto = False
+
+def sendFav(status_id):
+	global veto
+	global vetorunning
+	sendpriv(line, "%d Sekunden Vetophase läuft." % (vetotime,), irc)
+	time.sleep(vetotime)
+	vetorunning = False
+	if (veto == False):
+		api.create_favorite(status_id)
 		sendpriv(line, "Das wäre erledigt.", irc)
 	veto = False
 
@@ -339,6 +372,9 @@ def cmd(command, line):
 		elif command == "!retweet":
 			retweet(line)
 			
+		elif command == "!fav":
+			fav(line)
+			
 		elif (command == "!veto"):
 			tweetVeto(line)
 		
@@ -359,6 +395,7 @@ def cmd(command, line):
 			sendpriv(line, "!tweet <Text> oder !twitter <Text> - sendet den String mit dem #nodrama.de Account direkt an Twitter", irc)
 			sendpriv(line, "!reply <Twitter-URL> <Text> - sendet ein @reply zum angegebenen Tweet vom #nodrama.de-Account", irc)
 			sendpriv(line, "!retweet <Twitter-URL> - retweetet den angegebenen Tweet mit dem #nodrama.de-Account", irc)
+			sendpriv(line, "!fav <Twitter-URL> - favt den angegebenen Tweet mit dem #nodrama.de-Account", irc)
 			sendpriv(line, "!veto - stoppt den aktuellen tweet", irc)
 		
 		elif (command == "!ignore"):
