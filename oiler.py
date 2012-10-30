@@ -225,23 +225,34 @@ def delQuote(line):
 def tweetIt(line):
 	global veto
 	global vetorunning
-	if (isQuery(line) == False):
-		try:
-			message = ' '.join(line[4:])
-			if (len(message) > 140):
-				sendpriv(line, "Ähem. Der Text ist zu lang.", irc)
-			else:
-				if (vetorunning == True):
-					sendpriv(line, "Äh, warte kurz!", irc)
-				else:
-					vetorunning = True
-					veto = False
-					tweetThread = threading.Thread(target=sendTweet, args=(message,))
-					tweetThread.start()
-		except: 
-			sendpriv(line, "Ohne Worte...", irc)	
-	else:
+
+	if isQuery(line):
 		sendpriv(line, "Musst schon öffentlich twittern ;)", irc)
+		return
+
+	in_reply_to_status_id = None
+	in_reply_to_user = None
+
+	# http://twitter.com/nodrama_de/status/263063321312382976
+	m = re.match(r"https?://(?:mobile.|www.)?twitter.com/(?P<username>[^/]*)/status/(?P<status_id>\d+)", line[4])
+	if m:
+		in_reply_to_status_id = m.group('status_id')
+		in_reply_to_user = m.group('username')
+		message = '@' + in_reply_to_user + ' ' + ' '.join(line[5:])
+	else:
+		message = ' '.join(line[4:])
+
+	if (len(message) > 140):
+		sendpriv(line, "Ähem. Der Text ist zu lang.", irc)
+	else:
+		if (vetorunning == True):
+			sendpriv(line, "Äh, warte kurz!", irc)
+		else:
+			vetorunning = True
+			veto = False
+			tweetThread = threading.Thread(target=sendTweet, args=(message,), kwargs={'in_reply_to': in_reply_to_status_id})
+			tweetThread.daemon = True
+			tweetThread.start()
 		
 def tweetVeto(line):
 	global veto
@@ -256,18 +267,18 @@ def tweetVeto(line):
 	else:
 		sendpriv(line, "Musst schon öffentlich veto einlegen ;)", irc)
 		
-def sendTweet(message):
+def sendTweet(message, in_reply_to=None):
 	global veto
 	global vetorunning
-	sendpriv(line, "15 Sekunden Vetophase läuft.", irc)
-	time.sleep(15)
+	sendpriv(line, "%d Sekunden Vetophase läuft." % (vetotime,), irc)
+	time.sleep(vetotime)
 	vetorunning = False
-	try:
-		if (veto == False):
+	if (veto == False):
+		if in_reply_to is not None:
+			api.update_status(message, in_reply_to)
+		else:
 			api.update_status(message)
-			sendpriv(line, "Tweet ist raus.", irc)
-	except:
-		sendpriv(line, "das hat nicht geklappt", irc)
+		sendpriv(line, "Tweet ist raus.", irc)
 	veto = False
 	
 # ende twitter kram
@@ -303,7 +314,7 @@ def cmd(command, line):
 			now = datetime.datetime.now()
 			sendpriv(line, now.strftime("%Y-%m-%d %H:%M"), irc)
 			
-		elif ((command == "!tweet") | (command == "!twitter")):
+		elif ((command == "!tweet") or (command == "!twitter") or (command == '!reply')):
 			tweetIt(line)
 			
 		elif (command == "!veto"):
@@ -323,7 +334,8 @@ def cmd(command, line):
 			sendpriv(line, "!delquote <nummer> -  Zitat löschen", irc)
 			sendpriv(line, "!ignore <nickname> <channel> <password> - Nur im Query. Nutzer von Botbenutzung ausschließen bzw wieder zulassen", irc)
 			sendpriv(line, "!time - Systemzeit ausgeben", irc)
-			sendpriv(line, "!tweet oder !twitter <Text> - sendet den String mit dem #nodrama.de Account direkt an Twitter", irc)
+			sendpriv(line, "!tweet <Text> oder !twitter <Text> - sendet den String mit dem #nodrama.de Account direkt an Twitter", irc)
+			sendpriv(line, "!reply <Twitter-URL> <Text> - sendet ein @reply zum angegebenen Tweet vom #nodrama.de-Account", irc)
 			sendpriv(line, "!veto - stoppt den aktuellen tweet", irc)
 		
 		elif (command == "!ignore"):
@@ -355,14 +367,15 @@ nick = config.nick
 chan = config.chan
 ownerpw = config.ownerpw
 
-consumer_key=config.consumer_key
-consumer_secret=config.consumer_secret
-access_token=config.access_token
-access_token_secret=config.access_token_secret
+consumer_key = config.consumer_key
+consumer_secret = config.consumer_secret
+access_token = config.access_token
+access_token_secret = config.access_token_secret
+
+vetotime = config.vetotime
 
 buffer = ""
 
-#globaler vetofoo
 vetorunning = False
 veto = False
 
