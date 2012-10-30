@@ -269,6 +269,7 @@ def tweetVeto(line):
 		if (vetorunning == True):
 			if (veto == False):
 				veto = True
+				vetorunning = False
 				sendpriv(line, "Anzeige ist raus!", irc)
 		else:
 			sendpriv(line, "läuft doch gar nischt", irc)
