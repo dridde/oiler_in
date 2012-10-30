@@ -397,29 +397,29 @@ while 1:
 	try:
 		buffer = buffer + irc.recv(1024)
 		newlines = string.split(buffer, "\n")
-		buffer = newlines.pop( )
-		
-	except:
-		sys.exit()
-	
-	for line in newlines:
-		line = string.rstrip(line)
-		line = string.split(line)
-		#output = " ".join(line)
-		#print output
-		
-		
-		try:
-			if (line[3][1] == "!"):
-				cmd(line[3][1:], line)
-				
-		except(IndexError):
-			pass
-		
-		# send pong gemäß RFC 1459 falls angefordert
-		if (line[0] == "PING"):
-			irc.send("PONG %s\r\n" % line[1])
-		
-		# rejoin nach kick
-		if (line[1] == "KICK" and line[3] == nick):
-			send("JOIN", line[2], irc)
+		buffer = newlines.pop()
+			
+		for line in newlines:
+			line = string.rstrip(line)
+			line = string.split(line)
+
+			print ' '.join(line)
+			
+			try:
+				if (line[3][1] == "!"):
+					cmd(line[3][1:], line)
+					
+			except(IndexError):
+				pass
+			
+			# send pong gemäß RFC 1459 falls angefordert
+			if (line[0] == "PING"):
+				irc.send("PONG %s\r\n" % line[1])
+			
+			# rejoin nach kick
+			if (line[1] == "KICK" and line[3] == nick):
+				send("JOIN", line[2], irc)
+
+	except (KeyboardInterrupt, SystemExit):
+		print 'Caught interrupt, quitting.'
+		sys.exit(0)
