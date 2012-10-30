@@ -1,0 +1,17 @@
+# adapt for your network
+network = 'irc.freenode.net'
+port = 6667
+nick = 'oiler_er_innen'
+chan = '#oilertest'
+# to make the bot !quit and !ignore and stuff
+ownerpw = 'trggr'
+
+vetotime = 15
+
+# get these from dev.twitter.com
+consumer_key = 'YOUR CONSUMER KEY'
+consumer_secret = 'YOUR CONSUMER SECRET'
+
+# get these from dev.twitter.com if you want
+access_token = 'OAUTH ACCESS TOKEN'
+access_token_secret = 'OAUTH ACCESS TOKEN SECRET'
