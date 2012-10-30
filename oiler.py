@@ -239,6 +239,28 @@ def tweetIt(line):
 			tweetThread = threading.Thread(target=sendTweet, args=(message,), kwargs={'in_reply_to': in_reply_to_status_id})
 			tweetThread.daemon = True
 			tweetThread.start()
+
+def retweet(line):
+	global veto
+	global vetorunning
+
+	if isQuery(line):
+		sendpriv(line, "Nich' auf die Privacy-Tour, Freundchen!", irc)
+		return
+
+	m = re.match(r"https?://(?:mobile.|www.)?twitter.com/[^/]+/status/(?P<status_id>\d+)", line[4])
+	if m is None:
+		sendpriv(line, "Ähem. Man kann nur Tweets re-tweeten. <erklaermaedchen.jpg>", irc)
+	else:
+		if (vetorunning == True):
+			sendpriv(line, "Äh, warte kurz!", irc)
+		else:
+			status_id = m.group('status_id')
+			vetorunning = True
+			veto = False
+			tweetThread = threading.Thread(target=sendRetweet, args=(status_id,))
+			tweetThread.daemon = True
+			tweetThread.start()
 		
 def tweetVeto(line):
 	global veto
@@ -266,7 +288,18 @@ def sendTweet(message, in_reply_to=None):
 			api.update_status(message)
 		sendpriv(line, "Tweet ist raus.", irc)
 	veto = False
-	
+
+def sendRetweet(status_id):
+	global veto
+	global vetorunning
+	sendpriv(line, "%d Sekunden Vetophase läuft." % (vetotime,), irc)
+	time.sleep(vetotime)
+	vetorunning = False
+	if (veto == False):
+		api.retweet(status_id)
+		sendpriv(line, "Das wäre erledigt.", irc)
+	veto = False
+
 # ende twitter kram
 
 
@@ -303,6 +336,9 @@ def cmd(command, line):
 		elif ((command == "!tweet") or (command == "!twitter") or (command == '!reply')):
 			tweetIt(line)
 			
+		elif command == "!retweet":
+			retweet(line)
+			
 		elif (command == "!veto"):
 			tweetVeto(line)
 		
@@ -322,6 +358,7 @@ def cmd(command, line):
 			sendpriv(line, "!time - Systemzeit ausgeben", irc)
 			sendpriv(line, "!tweet <Text> oder !twitter <Text> - sendet den String mit dem #nodrama.de Account direkt an Twitter", irc)
 			sendpriv(line, "!reply <Twitter-URL> <Text> - sendet ein @reply zum angegebenen Tweet vom #nodrama.de-Account", irc)
+			sendpriv(line, "!retweet <Twitter-URL> - retweetet den angegebenen Tweet mit dem #nodrama.de-Account", irc)
 			sendpriv(line, "!veto - stoppt den aktuellen tweet", irc)
 		
 		elif (command == "!ignore"):
