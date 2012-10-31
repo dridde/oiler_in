@@ -9,7 +9,7 @@ ownerpw = 'trggr'
 vetotime = 15
 
 # name of your twitter account, for informational purposes only
-twitter_account = '@nodrama_de'
+twitter_account = '@ev'
 
 # get these from dev.twitter.com
 consumer_key = 'YOUR CONSUMER KEY'
