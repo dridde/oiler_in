@@ -372,10 +372,10 @@ def cmd(command, line):
 			
 		elif command == "!retweet":
 			retweet(line)
-			
+
 		elif command == "!fav":
 			fav(line)
-			
+
 		elif (command == "!veto"):
 			tweetVeto(line)
 		
