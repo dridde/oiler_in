@@ -21,3 +21,6 @@ def unescape(text):
         pass
     return text # leave as is
   return re.sub("&#?\w+;", fixup, text)
+
+def is_channel(target):
+  return target[0] in '&#+!'
