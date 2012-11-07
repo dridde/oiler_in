@@ -49,6 +49,8 @@ class IRCConnection:
 
     nick, userhost = parse_prefix(prefix)
 
+    print 'dispatch(prefix="%s", cmd="%s", lookup_cmd="%s")' % (prefix, cmd, lookup_cmd)
+
     if lookup_cmd in self.callbacks:
       if cmd == 'PRIVMSG' or cmd == 'KICK':
         fargs = [nick, userhost, args[0], ' '.join(args[1:])]
@@ -69,7 +71,7 @@ class IRCConnection:
       fargs.insert(0, self)
 
       for func in self.callbacks[lookup_cmd]:
-        print('args = %s' % args)
+        print('fargs = %s' % fargs)
         if func(*fargs):
           return True
     return False
