@@ -1,6 +1,8 @@
 #!/usr/bin/env/python
 # -*- coding:utf-8 -*-
 
+import oilib.numreplies
+
 def parse_irc_line(raw):
 	parts = raw.strip().split(" ")
 	if parts[0][0] == ':':
@@ -14,6 +16,12 @@ def parse_irc_line(raw):
 		command = parts[0]
 		args = parts[1:]
 
+	if command.isdigit():
+		try:
+			command = oilib.numreplies.numerics[command]
+		except KeyError:
+			print('!!! unknown numeric: %s' % command)
+
 	command = command.upper()
 
 	for idx, arg in enumerate(args):
@@ -24,21 +32,42 @@ def parse_irc_line(raw):
 	return (prefix, command, args)
 
 def parse_prefix(prefix):
-	nick, userhost = prefix.split('!')
+	if '!' in prefix:
+		nick, userhost = prefix.split('!')
+	else:
+		nick = prefix
+		userhost = None
 
 	return (nick, userhost)
 
 def parse_modes(args):
+	"""Parse a mode string, such as:
+	
+		+b *!*@*.edu +e *!*@*.bu.edu
+		+be *!*@*.edu *!*@*.bu.edu
+		-l
+		+l 25
+		-ov+o foo bar moeffju	
+	"""
+	simple_modes = 'aimnqpsrt'
+	complex_modes = 'klbeIOov'
+
 	result = []
-	mode = '+'
-	idx = 1
-	for c in args[0]:
+	sign = '+'
+	for c in args.pop(0):
 		if c == '+':
-			mode = '+'
+			sign = '+'
 		elif c == '-':
-			mode = '-'
+			sign = '-'
 		else:
-			result.append([mode, c, args[idx]])
-			idx += 1
+			if c in complex_modes and args:
+				result.append([sign, c, args.pop(0)])
+			else:
+				result.append([sign, c, None])
 	
 	return result
+
+if __name__ == '__main__':
+	print '# parse_modes'
+	for x in ['+b *!*@*.edu +e *!*@*.bu.edu', '+be *!*@*.edu *!*@*.bu.edu', '-l', '+l 25', '-ov+o foo bar moeffju']:
+	  print parse_modes(x.split(' '))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
-from oilib.parse import parse_irc_line
+from oilib.parse import parse_irc_line, parse_modes, parse_prefix
 
 import sys, socket
 #, string, time, datetime, re, random, tweepy, threading
@@ -47,26 +47,41 @@ class IRCConnection:
     if 'fallback' in kwargs:
       lookup_cmd = '*'
 
+    nick, userhost = parse_prefix(prefix)
+
     if lookup_cmd in self.callbacks:
-      
-      if cmd == 'PRIVMSG':
-        fargs = [args[0], ' '.join(args[1:])]
-      elif lookup_cmd == '*':
-        fargs = [prefix, cmd, args]
+      if cmd == 'PRIVMSG' or cmd == 'KICK':
+        fargs = [nick, userhost, args[0], ' '.join(args[1:])]
+
+      elif cmd == 'JOIN' or cmd == 'PART':
+        fargs = [nick, userhost, args[0]]
+
+      elif cmd == 'MODE':
+        modes = parse_modes(args[1:])
+        fargs = [nick, userhost, args[0], modes]
+
       else:
-        fargs = [cmd, args]
+        fargs = [nick, userhost, cmd, args]
+
+      if lookup_cmd == '*':
+        fargs = [prefix, cmd, args]
+
+      fargs.insert(0, self)
 
       for func in self.callbacks[lookup_cmd]:
+        print('args = %s' % args)
         if func(*fargs):
           return True
     return False
 
   def connect(self):
     self.socket.connect((self.server, self.port))
+    # TODO error handling :o
     if self.password:
       self.send('PASS', self.password)
     self.send('NICK', self.nick)
-    self.send('USER', self.user, 12, '*', ':' + self.realname)
+    # 12 = +iw
+    self.send('USER', self.user, '12', '*', ':' + self.realname)
     for channel in self.channels:
       self.join(channel)
 
