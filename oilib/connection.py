@@ -122,3 +122,9 @@ class IRCConnection:
   def part(self, channel):
     self.send('PART', channel)
 
+  def privmsg(self, target, message):
+    self.send('PRIVMSG', target, ':' + message)
+
+  def notice(self, target, message):
+    self.send('NOTICE', target, ':' + message)
+
