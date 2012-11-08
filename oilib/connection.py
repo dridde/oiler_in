@@ -80,6 +80,7 @@ class IRCConnection:
     return False
 
   def connect(self):
+    self.socket.settimeout(300)
     self.socket.connect((self.server, self.port))
     # TODO error handling :o
     if self.password:
@@ -112,7 +113,10 @@ class IRCConnection:
               if command == 'PING':
                 self.send('PONG', ':' + args[0])
 
-        except (KeyboardInterrupt, SystemExit):
+        except socket.timeout:
+          print("Timeout, reconnecting...")
+          self.connect()
+        except KeyboardInterrupt, SystemExit:
           print("Caught interrupt, quitting...")
           sys.exit(0)
     finally:
