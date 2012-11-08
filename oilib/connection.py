@@ -47,7 +47,10 @@ class IRCConnection:
     if 'fallback' in kwargs:
       lookup_cmd = '*'
 
-    nick, userhost = parse_prefix(prefix)
+    if prefix:
+      nick, userhost = parse_prefix(prefix)
+    else:
+      nick, userhost = (None, None)
 
     print 'dispatch(prefix="%s", cmd="%s", lookup_cmd="%s")' % (prefix, cmd, lookup_cmd)
 
