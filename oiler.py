@@ -1,7 +1,37 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
-import sys, socket, string, time, datetime, urllib, re, random, tweepy, threading, config
+import config
+
+import sys, socket, string, time, datetime, urllib, re, random, tweepy, threading, htmlentitydefs
+
+##
+# Removes HTML or XML character references and entities from a text string.
+#
+# @source http://effbot.org/zone/re-sub.htm#unescape-html
+# @param text The HTML (or XML) source text.
+# @return The plain text, as a Unicode string, if necessary.
+
+def unescape(text):
+	def fixup(m):
+		text = m.group(0)
+		if text[:2] == "&#":
+			# character reference
+			try:
+				if text[:3] == "&#x":
+					return unichr(int(text[3:-1], 16))
+				else:
+					return unichr(int(text[2:-1]))
+			except ValueError:
+				pass
+		else:
+			# named entity
+			try:
+				text = unichr(htmlentitydefs.name2codepoint[text[1:-1]])
+			except KeyError:
+				pass
+		return text # leave as is
+	return re.sub("&#?\w+;", fixup, text)
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -210,10 +240,32 @@ def delQuote(line):
 # ende quote handling
 
 # twitter kram
-def tweetIt(line):
-	global veto
-	global vetorunning
+def vetoable(func, *args, **kwargs):
+	global veto_timer
 
+	print 'vetoable(%s, %s, %s)' % (func, args, kwargs)
+	if veto_timer and veto_timer.is_alive():
+		sendpriv(line, "Äh, warte kurz!", irc)
+	else:
+		sendpriv(line, "%d Sekunden Vetophase läuft." % (vetotime,), irc)
+		veto_timer = threading.Timer(vetotime, func, args, kwargs)
+		veto_timer.start()
+
+def tweetVeto(line):
+	global veto_timer
+
+	if isQuery(line):
+		sendpriv(line, "Musst schon öffentlich veto einlegen ;)", irc)
+		return
+
+	if veto_timer and veto_timer.is_alive():
+		veto_timer.cancel()
+		sendpriv(line, "Anzeige ist raus!", irc)
+	else:
+		sendpriv(line, "läuft doch gar nischt", irc)
+
+
+def tweetIt(line):
 	if isQuery(line):
 		sendpriv(line, "Musst schon öffentlich twittern ;)", irc)
 		return
@@ -233,19 +285,9 @@ def tweetIt(line):
 	if (len(message) > 140):
 		sendpriv(line, "Ähem. Der Text ist zu lang.", irc)
 	else:
-		if (vetorunning == True):
-			sendpriv(line, "Äh, warte kurz!", irc)
-		else:
-			vetorunning = True
-			veto = False
-			tweetThread = threading.Thread(target=sendTweet, args=(message,), kwargs={'in_reply_to': in_reply_to_status_id})
-			tweetThread.daemon = True
-			tweetThread.start()
+		vetoable(sendTweet, message, in_reply_to=in_reply_to_status_id)
 
 def retweet(line):
-	global veto
-	global vetorunning
-
 	if isQuery(line):
 		sendpriv(line, "Nich' auf die Privacy-Tour, Freundchen!", irc)
 		return
@@ -254,20 +296,11 @@ def retweet(line):
 	if m is None:
 		sendpriv(line, "Ähem. Man kann nur Tweets re-tweeten. <erklaermaedchen.jpg>", irc)
 	else:
-		if (vetorunning == True):
-			sendpriv(line, "Äh, warte kurz!", irc)
-		else:
-			status_id = m.group('status_id')
-			vetorunning = True
-			veto = False
-			tweetThread = threading.Thread(target=sendRetweet, args=(status_id,))
-			tweetThread.daemon = True
-			tweetThread.start()
+		status_id = m.group('status_id')
+		vetoable(sendRetweet, status_id)
 		
 def fav(line):
-	global veto
-	global vetorunning
-
+	print 'fav(%s)' % line
 	if isQuery(line):
 		sendpriv(line, "Nich' auf die Privacy-Tour, Freundchen!", irc)
 		return
@@ -276,65 +309,29 @@ def fav(line):
 	if m is None:
 		sendpriv(line, "Ähem. Man kann nur Tweets faven. <erklaermaedchen.jpg>", irc)
 	else:
-		if (vetorunning == True):
-			sendpriv(line, "Äh, warte kurz!", irc)
-		else:
-			status_id = m.group('status_id')
-			vetorunning = True
-			veto = False
-			tweetThread = threading.Thread(target=sendFav, args=(status_id,))
-			tweetThread.daemon = True
-			tweetThread.start()
+		status_id = m.group('status_id')
+		vetoable(sendFav, status_id)
 		
-def tweetVeto(line):
-	global veto
-	global vetorunning
-	if (isQuery(line) == False):
-		if (vetorunning == True):
-			if (veto == False):
-				veto = True
-				vetorunning = False
-				sendpriv(line, "Anzeige ist raus!", irc)
-		else:
-			sendpriv(line, "läuft doch gar nischt", irc)
-	else:
-		sendpriv(line, "Musst schon öffentlich veto einlegen ;)", irc)
-		
-def sendTweet(message, in_reply_to=None):
-	global veto
-	global vetorunning
-	sendpriv(line, "%d Sekunden Vetophase läuft." % (vetotime,), irc)
-	time.sleep(vetotime)
-	vetorunning = False
-	if (veto == False):
-		if in_reply_to is not None:
-			api.update_status(message, in_reply_to)
-		else:
-			api.update_status(message)
+def sendTweet(message, **kwargs):
+	try:
+		api.update_status(message, **kwargs)
 		sendpriv(line, "Tweet ist raus.", irc)
-	veto = False
+	except tweepy.TweepError as e:
+		sendpriv(line, "Das hat nicht geklappt: %s" % e.reason, irc)
 
 def sendRetweet(status_id):
-	global veto
-	global vetorunning
-	sendpriv(line, "%d Sekunden Vetophase läuft." % (vetotime,), irc)
-	time.sleep(vetotime)
-	vetorunning = False
-	if (veto == False):
+	try:
 		api.retweet(status_id)
 		sendpriv(line, "Das wäre erledigt.", irc)
-	veto = False
+	except tweepy.TweepError as e:
+		sendpriv(line, "Das hat nicht geklappt: %s" % e.reason, irc)
 
 def sendFav(status_id):
-	global veto
-	global vetorunning
-	sendpriv(line, "%d Sekunden Vetophase läuft." % (vetotime,), irc)
-	time.sleep(vetotime)
-	vetorunning = False
-	if (veto == False):
+	try:
 		api.create_favorite(status_id)
 		sendpriv(line, "Das wäre erledigt.", irc)
-	veto = False
+	except tweepy.TweepError as e:
+		sendpriv(line, "Das hat nicht geklappt: %s" % e.reason, irc)
 
 def display_tweet(status_id):
 	tweet = api.get_status(status_id)
@@ -373,7 +370,7 @@ def cmd(command, line):
 		elif (command == "!time"):
 			now = datetime.datetime.now()
 			sendpriv(line, now.strftime("%Y-%m-%d %H:%M"), irc)
-			
+		
 		elif ((command == "!tweet") or (command == "!twitter") or (command == '!reply')):
 			tweetIt(line)
 			
@@ -444,13 +441,20 @@ vetotime = config.vetotime
 
 buffer = ""
 
-vetorunning = False
-veto = False
+veto_timer = None
 
 auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret)
 
 api = tweepy.API(auth)
+
+print "Verifying Twitter credentials..."
+user = api.verify_credentials()
+if user:
+	print 'Authenticated with Twitter as @%s' % user.screen_name
+else:
+	print 'Could not verify credientials. Check your Twitter credentials in config.py!'
+	sys.exit(1)
 
 irc = socket.socket()
 irc.connect((network, port))
@@ -466,7 +470,7 @@ def twitterLurk():
 		mentions = api.mentions()
 		for status in mentions:
 			if (status.created_at > datetime.datetime.utcnow()-datetime.timedelta(minutes=1)):
-				irc.send("PRIVMSG " + chan + " :" + "Tweet von " + str("@" + status.author.screen_name) + ": " + str(status.text) + "\r\n")
+				irc.send("PRIVMSG " + chan + " :" + "Tweet von " + str("@" + status.author.screen_name) + ": " + unescape(status.text).encode('utf-8') + "\r\n")
 
 t = threading.Thread(target=twitterLurk)
 t.daemon = True
