@@ -163,14 +163,15 @@ def info(irc, nick, userhost, target, cmd, args):
 	return True
 
 def help(irc, nick, userhost, target, cmd, args):
-	irc.notice(target, 'Mögliche Befehle:')
-	
 	if is_channel(target):
+		# show only commands that trigger from channel
 		flag = CMD_CHANNEL
 	else:
-		flag = CMD_QUERY
+		# show everything
+		flag = CMD_QUERY | CMD_CHANNEL
 		target = nick
 
+	irc.notice(target, 'Mögliche Befehle:')
 	for cmd in msg_triggers:
 		if cmd[1] and cmd[2] & flag == flag:
 			if type(cmd[1]) == list:
@@ -327,7 +328,7 @@ msg_triggers = [
 	[['!time'], 'Systemzeit ausgeben', CMD_CHANNEL | CMD_QUERY, time],
 	[['!ignore'], ['<Usermask> <Channel> <Owner-Passwort>', 'Usermask von Botbenutzung ausschließen'], CMD_QUERY, ignore],
 	[['!ignored'], ['<Usermask> <Channel> <Owner-Passwort>', 'Check if <usermask> is ignored in <target>'], CMD_QUERY, ignored],
-	[['!quit'], 'Raus!', CMD_QUERY, quit],
+	[['!quit'], ['<Owner-Passwort>', 'Raus!'], CMD_QUERY, quit],
 ]
 
 veto_timer = None
