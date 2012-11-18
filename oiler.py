@@ -33,6 +33,9 @@ def unescape(text):
 		return text # leave as is
 	return re.sub("&#?\w+;", fixup, text)
 
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 # MetaKram
 
 #Username der schreibt
@@ -81,10 +84,9 @@ def send(type, msg, irc):
 # sende normale channelnachricht
 def sendpriv(line, msg, irc):
 	if (isQuery(line) == True):
-		irc.send("PRIVMSG " + getName(line) + " :" + str(msg) + "\r\n")
+		irc.send(u"PRIVMSG %s :%s\r\n" % (getName(line), msg))
 	else:
-		irc.send("PRIVMSG " + getChannel(line) + " :" + str(msg) + "\r\n")
-
+		irc.send(u"PRIVMSG %s :%s\r\n" % (getChannel(line), msg))
 
 def checkQueryPW(line, position = 6):
 	if (isQuery(line) == True):
@@ -331,6 +333,11 @@ def sendFav(status_id):
 	except tweepy.TweepError as e:
 		sendpriv(line, "Das hat nicht geklappt: %s" % e.reason, irc)
 
+def display_tweet(status_id):
+	tweet = api.get_status(status_id)
+	print tweet.text
+	sendpriv(line, u"Tweet von %s: %s" % (u'@' + tweet.user.screen_name, unicode(tweet.text)), irc)
+
 # ende twitter kram
 
 
@@ -460,7 +467,7 @@ send("JOIN", chan, irc)
 def twitterLurk():
 	while 1:
 		time.sleep(60)
-		mentions = api.mentions();
+		mentions = api.mentions()
 		for status in mentions:
 			if (status.created_at > datetime.datetime.utcnow()-datetime.timedelta(minutes=1)):
 				irc.send("PRIVMSG " + chan + " :" + "Tweet von " + str("@" + status.author.screen_name) + ": " + unescape(status.text).encode('utf-8') + "\r\n")
@@ -476,14 +483,18 @@ while 1:
 		buffer = newlines.pop()
 			
 		for line in newlines:
-			line = string.rstrip(line)
-			line = string.split(line)
+			unbroken = string.rstrip(line)
+			line = string.split(unbroken)
 
-			print ' '.join(line)
+			print unbroken
 			
 			try:
 				if (line[3][1] == "!"):
 					cmd(line[3][1:], line)
+				else:
+					m = re.search(r"https?://(?:mobile.|www.)?twitter.com/(?P<username>[^/]*)/status/(?P<status_id>\d+)", unbroken)
+					if m:
+						display_tweet(m.group('status_id'))
 					
 			except(IndexError):
 				pass
