@@ -3,19 +3,163 @@
 
 import config
 
+import threading
+import tweepy
+
 from oilib.helpers import *
 from oilib.connection import IRCConnection
+from random import randint
+from datetime import datetime
+from fnmatch import fnmatchcase
+
+
+class Quotes:
+	def __init__(self, target):
+		self.fn = './quotes_' + target + '.txt'
+		self.f = open(self.fn, 'a+')
+		self.f.seek(0)
+		self.quotes = self.f.read().splitlines()
+
+	def save(self):
+		self.f.seek(0)
+		self.f.truncate()
+		self.f.write('\n'.join(self.quotes))
+		self.f.flush()
+
+	def add(self, quote):
+		self.quotes.append(quote)
+
+	def delete(self, idx):
+		try:
+			if idx < 1 or idx > self.count():
+				raise IndexError
+			del self.quotes[idx - 1]
+			return True
+		except IndexError:
+			return False
+
+	def count(self):
+		return len(self.quotes)
+
+	def show(self, idx):
+		"""1-indexed for hu-mons!"""
+		if idx < 1 or idx > self.count():
+			raise IndexError
+		return self.quotes[idx - 1].rstrip("\r\n")
+
+
+class Ignores:
+	def __init__(self, target):
+		self.fn = './ignored_' + target + '.txt'
+		self.f = open(self.fn, 'a+')
+		self.f.seek(0)
+		self.ignored = self.f.read().splitlines()
+
+	def save(self):
+		self.f.seek(0)
+		self.f.truncate()
+		self.f.write('\n'.join(self.ignored))
+		self.f.flush()
+
+	def match(self, usermask):
+		return (self.index(usermask) is not None)
+
+	def index(self, usermask):
+		try:
+			return (i for i,mask in enumerate(self.ignored) if fnmatchcase(usermask, mask)).next()
+		except StopIteration:
+			return None
+
+	def add(self, usermask):
+		self.ignored.append(usermask)
+
+	def delete(self, idx):
+		del self.ignored[idx]
+
+	def delete_mask(self, usermask):
+		x = self.index(usermask)
+		if x:
+			self.delete(x)
+			return True
+		return False
+
 
 def twitter(irc, nick, userhost, target, cmd, args, what):
-	print 'twitter <%s@%s/%s> (%s, %s) (%s)' % (nick, userhost, target, cmd, args, what)
-	return False
+	# print '--- twitter <%s!%s/%s> (%s, %s) (%s)' % (nick, userhost, target, cmd, args, what)
+
+	f = None
+	a = []
+	k = {}
+	args = args.split(' ')
+
+	m = re.match(r"(?:https?://(?:mobile.|www.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", args[0])
+	if what == 'tweet' or what == 'reply':
+		f = api.update_status
+		if what == 'reply':
+			sucess = 'Reply ist raus.'
+			if m.group('status_id'):
+				k['in_reply_to'] = m.group('status_id')
+			if m.group('username'):
+				a = '@' + m.group('username') + ' ' + ' '.join(args)
+			elif args[1].startswith('@'):
+				a = ' '.join(args)
+			else:
+				irc.notice(target, 'Entweder brauche ich eine URL mit nem Username, oder du musst den User selbst @-mentionen.')
+				return False
+		else:
+			success = 'Tweet ist raus.'
+			a = ' '.join(args)
+	elif what == 'rt' or what == 'fav':
+		if m:
+			if what == 'fav':
+				success = 'Fav ist raus.'
+				f = api.create_favorite
+				a = m.group('status_id')
+			elif what == 'rt':
+				success = 'Retweet ist raus.'
+				f = api.retweet
+				a = m.group('status_id')
+		else:
+			irc.notice(target, 'Vielleicht mal eine Twitter-URL oder Tweet-ID mitgeben, wa?')
+			return False
+	else:
+		return False
+
+	def sub():
+		try:
+			aa = [a]
+			f(*aa, **k)
+			irc.notice(target, success)
+		except tweepy.TweepError as e:
+			irc.notice(target, 'Das hat nicht geklappt: %s' % e.reason)
+
+	vetoable(irc, target, sub)
+
+def vetoable(irc, target, f):
+	global veto_timer
+
+	# print 'vetoable f=%s' % (f)
+	if veto_timer and veto_timer.is_alive():
+		irc.notice(target, 'Äh, warte kurz!')
+	else:
+		irc.notice(target, '%d Sekunden Vetophase läuft.' % (config.vetotime,))
+		veto_timer = threading.Timer(config.vetotime, f)
+		veto_timer.start()
 
 def veto(irc, nick, userhost, target, cmd, args):
-	print 'veto <%s@%s/%s> (%s, %s)' % (nick, userhost, target, cmd, args)
+	global veto_timer
+	
+	# print '--- veto <%s!%s/%s> (%s, %s)' % (nick, userhost, target, cmd, args)
+
+	if veto_timer and veto_timer.is_alive():
+		veto_timer.cancel()
+		irc.notice(target, 'Anzeige ist raus!')
+	else:
+		irc.notice(target, 'Läuft doch jar nüscht.')
 	return False
 
 def info(irc, nick, userhost, target, cmd, args):
-	irc.notice(target, 'Quote(s) durch '+config.nick+'!')
+	irc.notice(target, 'Quote(s) und mehr durch '+config.nick+'!')
 	return True
 
 def help(irc, nick, userhost, target, cmd, args):
@@ -25,13 +169,114 @@ def help(irc, nick, userhost, target, cmd, args):
 		flag = CMD_CHANNEL
 	else:
 		flag = CMD_QUERY
+		target = nick
 
 	for cmd in msg_triggers:
 		if cmd[1] and cmd[2] & flag == flag:
-			irc.notice(target, ' oder '.join(cmd[0]) + ' - ' + cmd[1])
+			if type(cmd[1]) == list:
+				x = ' oder '.join(cmd[0]) + ' ' + cmd[1][0]
+				y = cmd[1][1]
+			else:
+				x = ' oder '.join(cmd[0])
+				y = cmd[1]
+			irc.notice(target, x + ' - ' + y)
+	return True
+
+def quote_add(irc, nick, userhost, target, cmd, args):
+	# print '--- quote_add <%s!%s/%s> %s: (%s)' % (nick, userhost, target, cmd, args)
+	q = Quotes(target)
+	q.add(args)
+	q.save()
+	irc.notice(target, "Quote #%d hinzugefügt." % q.count())
+	return True
+
+def quote_del(irc, nick, userhost, target, cmd, args):
+	# print '--- quote_del <%s!%s/%s> %s: (%s)' % (nick, userhost, target, cmd, args)
+	q = Quotes(target)
+	q.delete(int(args))
+	q.save()
+	irc.notice(target, "Quote #%d gelöscht." % int(args))
+	return True
+
+def quote_show(irc, nick, userhost, target, cmd, args):
+	# print '--- quote_show <%s!%s/%s> %s: (%s)' % (nick, userhost, target, cmd, args)
+	q = Quotes(target)
+	try:
+		if args:
+			r = int(args)
+			irc.notice(target, "Quote #%d: %s" % (r, q.show(r)))
+		else:
+			r = randint(0, q.count()) + 1
+			irc.notice(target, "Quote #%d: %s" % (r, q.show(r)))
+		return True
+	except IndexError:
+		irc.notice(target, "Diese Quote gibt es nicht.")
+		return True
+
+def time(irc, nick, userhost, target, cmd, args):
+	irc.notice(target, datetime.now().strftime("%Y-%m-%d %H:%M"))
+	return True
+
+def ignore(irc, nick, userhost, target, cmd, args):
+	# print '--- ignore <%s!%s/%s> %s: (%s)' % (nick, userhost, target, cmd, args)
+	try:
+		usermask, channel, pw = args.split()
+		if not '!' in usermask:
+			usermask += '!*@*'
+		if not '@' in usermask:
+			usermask += '@*'
+		if pw == config.ownerpw:
+			ignores = Ignores(channel)
+			ignores.add(usermask)
+			ignores.save()
+			irc.notice(nick, "Added %s to ignore list for %s." % (usermask, channel))
+			return True
+		else:
+			irc.notice(nick, "Nice try.")
+		return False
+	except ValueError:
+		irc.notice(nick, "Süntaks, kennst du es? Fersuche !help.")
+		return True
+
+def check_ignored(target, usermask):
+	ignores = Ignores(target)
+	return ignores.match(usermask)
+
+def ignored(irc, nick, userhost, target, cmd, args):
+	# print '--- ignored <%s!%s/%s> %s: (%s)' % (nick, userhost, target, cmd, args)
+	try:
+		usermask, channel, pw = args.split()
+		if not '!' in usermask:
+			usermask += '!*@*'
+		if not '@' in usermask:
+			usermask += '@*'
+		if pw == config.ownerpw:
+			if check_ignored(channel, usermask):
+				irc.notice(nick, "Yup, %s is ignored in %s." % (usermask, channel))
+			else:
+				irc.notice(nick, "Nope, %s is not ignored in %s." % (usermask, channel))
+			return True
+		else:
+			irc.notice(nick, "Nice try.")
+		return False
+	except ValueError:
+		irc.notice(nick, "Süntaks, kennst du es? Fersuche !help.")
+		return True
+
+def quit(irc, nick, userhost, target, cmd, args):
+	
+	if not args:
+		args = 'Good bye.'
+	irc.send('QUIT', ':'+args)
+	raise SystemExit
 	return True
 
 def handle_privmsg(irc, nick, userhost, target, message):
+	if check_ignored(target, nick + '!' + userhost):
+		# silently ignore
+		print '### ignored command from %s!%s' % (nick, userhost)
+		return True
+
 	try:
 		cmd, args = message.split(' ', 1)
 	except ValueError:
@@ -58,15 +303,9 @@ def handle_kick(irc, nick, userhost, target, victim):
 	return True
 
 def handle_unknown(irc, prefix, command, args):
-	print 'UNKNOWN: %s %s %s' % (prefix, command, args)
+	# print '@@@ UNKNOWN: %s %s %s' % (prefix, command, args)
 	return False
 
-def main():
-	irc = IRCConnection(server=config.server, port=config.port, password=config.password, nick=config.nick, realname=config.realname, user=config.user, channels=[config.chan])
-	irc.on('privmsg', handle_privmsg)
-	irc.on('kick', handle_kick)
-	irc.on('*', handle_unknown)
-	irc.connect()
 
 CMD_CHANNEL = 1
 CMD_QUERY = 2
@@ -75,12 +314,43 @@ msg_triggers = [
 	# triggers, CMD_CHANNEL | CMD_QUERY, func, *args, **kwargs
 	[['!info'], None, CMD_CHANNEL, info],
 	[['!help'], 'Diese Liste', CMD_CHANNEL | CMD_QUERY, help],
-	[['!tweet', '!twitter'], 'Einen Tweet absetzen', CMD_CHANNEL, twitter, ['tweet']],
-	[['!reply', '!re'], 'Auf einen Tweet antworten', CMD_CHANNEL, twitter, ['reply']],
-	[['!fav', '!favorite', '!favourite'], 'Einen Tweet faven', CMD_CHANNEL, twitter, ['fav']],
-	[['!rt', '!retweet'], 'Einen Tweet RTen', CMD_CHANNEL, twitter, ['rt']],
-	[['!veto'], 'Veto einlegen', CMD_CHANNEL, veto],
+	# Twitter
+	[['!tweet', '!twitter'], ['<Text>', 'Twittert <Text> als '+config.twitter_account], CMD_CHANNEL, twitter, ['tweet']],
+	[['!reply', '!re'], ['<Tweet-URL oder ID> <Text>', 'Twittert <Text> als Antwort auf den angegebenen Tweet'], CMD_CHANNEL, twitter, ['reply']],
+	[['!fav', '!favorite', '!favourite'], ['<Tweet-URL oder ID>', 'Favt den angegebenen Tweet'], CMD_CHANNEL, twitter, ['fav']],
+	[['!rt', '!retweet'], ['<Tweet-URL oder ID>', 'Retweetet den angegebenen Tweet'], CMD_CHANNEL, twitter, ['rt']],
+	[['!veto'], 'Stoppt die aktuelle Twitter-Aktion', CMD_CHANNEL, veto],
+	# Quotes
+	[['!addquote'], ['<Text>', 'Text als Quote hinzufügen'], CMD_CHANNEL, quote_add],
+	[['!quote'], 'Zufällige Quote anzeigen', CMD_CHANNEL, quote_show],
+	[['!quote'], ['<Nummer>', 'Bestimmte Quote anzeigen'], CMD_CHANNEL, quote_show],
+	[['!delquote'], ['<Nummer>', 'Quote löschen'], CMD_CHANNEL, quote_del],
+	# Tools
+	[['!time'], 'Systemzeit ausgeben', CMD_CHANNEL | CMD_QUERY, time],
+	[['!ignore'], ['<Usermask> <Channel> <Owner-Passwort>', 'Usermask von Botbenutzung ausschließen'], CMD_QUERY, ignore],
+	[['!ignored'], ['<Usermask> <Channel> <Owner-Passwort>', 'Check if <usermask> is ignored in <target>'], CMD_QUERY, ignored],
+	[['!quit'], 'Raus!', CMD_QUERY, quit],
 ]
 
-if __name__ == "__main__":
-	main()
+veto_timer = None
+
+auth = tweepy.OAuthHandler(config.consumer_key, config.consumer_secret)
+auth.set_access_token(config.access_token, config.access_token_secret)
+
+api = tweepy.API(auth)
+
+# Twitter init
+print "Verifying Twitter credentials..."
+user = api.verify_credentials()
+if user:
+	print 'Authenticated with Twitter as @%s' % user.screen_name
+else:
+	print 'Could not verify credientials. Check your Twitter credentials in config.py!'
+	sys.exit(1)
+
+# main
+irc = IRCConnection(server=config.server, port=config.port, password=config.password, nick=config.nick, realname=config.realname, user=config.user, channels=[config.chan])
+irc.on('privmsg', handle_privmsg)
+irc.on('kick', handle_kick)
+irc.on('*', handle_unknown)
+irc.connect()

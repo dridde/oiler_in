@@ -2,9 +2,9 @@
 # -*- coding:utf-8 -*-
 
 from oilib.parse import parse_irc_line, parse_modes, parse_prefix
+from sys import stdout, stderr
 
 import sys, socket
-#, string, time, datetime, re, random, tweepy, threading
 
 class IRCConnection:
   """Connects to an IRC server and allows you to send and receive messages."""
@@ -22,10 +22,17 @@ class IRCConnection:
     self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
   def log_send(self, line):
-    print(" -> %s" % line)
+    stderr.write(" -> %s\n" % line)
 
   def log_recv(self, line):
-    print("<-  %s" % line)
+    stderr.write("<-  %s\n" % line)
+
+  def log_debug(self, line):
+    #stderr.write("??? %s\n" % line)
+    pass
+
+  def log_error(self, line):
+    stderr.write("!!! %s\n" % line)
 
   def sendline(self, line):
     self.log_send(line)
@@ -52,7 +59,7 @@ class IRCConnection:
     else:
       nick, userhost = (None, None)
 
-    print 'dispatch(prefix="%s", cmd="%s", lookup_cmd="%s")' % (prefix, cmd, lookup_cmd)
+    self.log_debug('dispatch(prefix="%s", cmd="%s", lookup_cmd="%s")' % (prefix, cmd, lookup_cmd))
 
     if lookup_cmd in self.callbacks:
       if cmd == 'PRIVMSG' or cmd == 'KICK':
@@ -74,22 +81,28 @@ class IRCConnection:
       fargs.insert(0, self)
 
       for func in self.callbacks[lookup_cmd]:
-        print('fargs = %s' % fargs)
+        self.log_debug('fargs = %s' % fargs)
         if func(*fargs):
           return True
     return False
 
   def connect(self):
     self.socket.settimeout(300)
-    self.socket.connect((self.server, self.port))
-    # TODO error handling :o
-    if self.password:
-      self.send('PASS', self.password)
-    self.send('NICK', self.nick)
-    # 12 = +iw
-    self.send('USER', self.user, '12', '*', ':' + self.realname)
-    for channel in self.channels:
-      self.join(channel)
+
+    try:
+      self.socket.connect((self.server, self.port))
+
+      # TODO error handling :o
+      if self.password:
+        self.send('PASS', self.password)
+      self.send('NICK', self.nick)
+      # 12 = +iw
+      self.send('USER', self.user, '12', '*', ':' + self.realname)
+      for channel in self.channels:
+        self.join(channel)
+    except socket.timeout:
+      self.log_error("Timeout connecting. Check your config and internet connection and try again.")
+      sys.exit(1)
 
     try:
       buffer = ''
@@ -114,10 +127,10 @@ class IRCConnection:
                 self.send('PONG', ':' + args[0])
 
         except socket.timeout:
-          print("Timeout, reconnecting...")
+          self.log_error("Timeout, reconnecting...")
           self.connect()
         except KeyboardInterrupt, SystemExit:
-          print("Caught interrupt, quitting...")
+          self.log_error("Caught interrupt, quitting...")
           sys.exit(0)
     finally:
       self.socket.close()
