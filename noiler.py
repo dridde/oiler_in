@@ -6,8 +6,8 @@ import config
 import threading
 import tweepy
 
-from oilib.helpers import *
-from oilib.connection import IRCConnection
+from noilib.helpers import *
+from noilib.connection import IRCConnection
 from random import randint
 from datetime import datetime
 from fnmatch import fnmatchcase

@@ -1,7 +1,7 @@
 #!/usr/bin/env/python
 # -*- coding:utf-8 -*-
 
-import oilib.numreplies
+import noilib.numreplies
 
 def parse_irc_line(raw):
 	parts = raw.strip().split(" ")
@@ -18,7 +18,7 @@ def parse_irc_line(raw):
 
 	if command.isdigit():
 		try:
-			command = oilib.numreplies.numerics[command]
+			command = noilib.numreplies.numerics[command]
 		except KeyError:
 			print('!!! unknown numeric: %s' % command)
 

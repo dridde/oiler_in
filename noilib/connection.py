@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
-from oilib.parse import parse_irc_line, parse_modes, parse_prefix
+from noilib.parse import parse_irc_line, parse_modes, parse_prefix
 from sys import stdout, stderr
 
 import sys, socket
