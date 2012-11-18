@@ -264,12 +264,10 @@ def ignored(irc, nick, userhost, target, cmd, args):
 		return True
 
 def quit(irc, nick, userhost, target, cmd, args):
-	
-	if not args:
-		args = 'Good bye.'
-	irc.send('QUIT', ':'+args)
-	raise SystemExit
-	return True
+	if args == config.ownerpw:
+		irc.send('QUIT', ':Sit. Stay. Good girl.')
+		raise SystemExit
+		return True
 
 def handle_privmsg(irc, nick, userhost, target, message):
 	if check_ignored(target, nick + '!' + userhost):
