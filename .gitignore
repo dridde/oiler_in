@@ -1,10 +1,4 @@
 config.py
-config.pyc
+*.pyc
 quotes*.txt
 ignored*.txt
-todo.txt
-nodrama.de/
-log/
-tweepy/
-oiler_test.py
-import.py
