@@ -1,7 +1,10 @@
 # adapt for your network
-network = 'irc.freenode.net'
+server = 'irc.freenode.net'
 port = 6667
+password = ''
 nick = 'oiler_er_innen'
+realname = 'oiler_er_innen'
+user = 'oiler_er_innen'
 chan = '#oilertest'
 # to make the bot !quit and !ignore and stuff
 ownerpw = 'trggr'
