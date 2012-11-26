@@ -93,7 +93,7 @@ def twitter(irc, nick, userhost, target, cmd, args, what):
 	k = {}
 	args = args.split(' ')
 
-	m = re.match(r"(?:https?://(?:mobile.|www.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", args[0])
+	m = re.match(r"(?:https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", args[0])
 	if what == 'tweet' or what == 'reply':
 		f = api.update_status
 		if what == 'reply':
@@ -295,6 +295,15 @@ def handle_privmsg(irc, nick, userhost, target, message):
 				kwargs = trigger[5] if len(trigger) > 5 else {}
 				if trigger[3](irc, nick, userhost, target, cmd, args, *splatargs, **kwargs):
 					return True
+
+	if is_channel(target):
+		m = re.match(r"(?:https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", message)
+		if m:
+			try:
+				tweet = api.get_status(m.group(status_id))
+				irc.privmsg(target, u"Tweet von %s: %s" % (u'@' + tweet.user.screen_name, unicode(tweet.text)))
+			except Exception as e:
+				irc.notice(target, 'Das hat nicht geklappt: %s' % e.reason)
 
 	return False
 
