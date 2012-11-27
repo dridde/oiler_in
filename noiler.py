@@ -9,7 +9,8 @@ import tweepy
 from noilib.helpers import *
 from noilib.connection import IRCConnection
 from random import randint
-from datetime import datetime
+from time import sleep
+from datetime import datetime, timedelta
 from fnmatch import fnmatchcase
 
 
@@ -92,7 +93,7 @@ def twitter(irc, nick, userhost, target, cmd, args, what):
 	k = {}
 	args = args.split(' ')
 
-	m = re.match(r"(?:https?://(?:mobile.|www.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", args[0])
+	m = re.match(r"(?:https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", args[0])
 	if what == 'tweet' or what == 'reply':
 		f = api.update_status
 		if what == 'reply':
@@ -295,6 +296,15 @@ def handle_privmsg(irc, nick, userhost, target, message):
 				if trigger[3](irc, nick, userhost, target, cmd, args, *splatargs, **kwargs):
 					return True
 
+	if is_channel(target):
+		m = re.match(r"(?:https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", message)
+		if m:
+			try:
+				tweet = api.get_status(m.group(status_id))
+				irc.privmsg(target, u"Tweet von %s: %s" % (u'@' + tweet.user.screen_name, unicode(tweet.text)))
+			except Exception as e:
+				irc.notice(target, 'Das hat nicht geklappt: %s' % e.reason)
+
 	return False
 
 def handle_kick(irc, nick, userhost, target, victim):
@@ -338,6 +348,17 @@ auth.set_access_token(config.access_token, config.access_token_secret)
 
 api = tweepy.API(auth)
 
+def twitter_mentions_thread(api, irc):
+	while True:
+		try:
+			sleep(30)
+			for status in api.mentions():
+				if status.created_at > datetime.utcnow() - timedelta(minutes=1):
+					irc.notice(config.chan, "Tweet von @%s: %s" % (status.author.screen_name, unescape(status.text).encode('utf-8')))
+		except Exception, e:
+			print "!!! Exception in twitter_mentions_thread:"
+			print e
+
 # Twitter init
 print "Verifying Twitter credentials..."
 user = api.verify_credentials()
@@ -351,5 +372,10 @@ else:
 irc = IRCConnection(server=config.server, port=config.port, password=config.password, nick=config.nick, realname=config.realname, user=config.user, channels=[config.chan])
 irc.on('privmsg', handle_privmsg)
 irc.on('kick', handle_kick)
-irc.on('*', handle_unknown)
+#irc.on('*', handle_unknown)
+
+t = threading.Thread(target=twitter_mentions_thread, args=(api, irc))
+t.daemon = True
+t.start()
+
 irc.connect()
