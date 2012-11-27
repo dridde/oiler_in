@@ -298,7 +298,7 @@ def handle_privmsg(irc, nick, userhost, target, message):
 					return True
 
 	if is_channel(target):
-		m = re.search(r"(?:https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", message)
+		m = re.search(r"https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/(?P<status_id>\d+)", message)
 		if m:
 			try:
 				tweet = api.get_status(m.group('status_id'))
