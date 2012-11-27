@@ -136,6 +136,7 @@ def twitter(irc, nick, userhost, target, cmd, args, what):
 			irc.notice(target, 'Das hat nicht geklappt: %s' % e.reason)
 
 	vetoable(irc, target, sub)
+	return True
 
 def vetoable(irc, target, f):
 	global veto_timer
@@ -298,7 +299,7 @@ def handle_privmsg(irc, nick, userhost, target, message):
 					return True
 
 	if is_channel(target):
-		m = re.search(r"(?:https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", message)
+		m = re.search(r"https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/(?P<status_id>\d+)", message)
 		if m:
 			try:
 				tweet = api.get_status(m.group('status_id'))
