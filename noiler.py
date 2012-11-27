@@ -301,10 +301,10 @@ def handle_privmsg(irc, nick, userhost, target, message):
 		m = re.match(r"(?:https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", message)
 		if m:
 			try:
-				tweet = api.get_status(m.group(status_id))
+				tweet = api.get_status(m.group('status_id'))
 				irc.privmsg(target, u"Tweet von %s: %s" % (u'@' + tweet.user.screen_name, unicode(tweet.text)))
 			except Exception as e:
-				irc.notice(target, 'Das hat nicht geklappt: %s' % e.reason)
+				irc.notice(target, 'Das hat nicht geklappt: %s' % e)
 
 	return False
 
