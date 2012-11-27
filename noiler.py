@@ -136,6 +136,7 @@ def twitter(irc, nick, userhost, target, cmd, args, what):
 			irc.notice(target, 'Das hat nicht geklappt: %s' % e.reason)
 
 	vetoable(irc, target, sub)
+	return True
 
 def vetoable(irc, target, f):
 	global veto_timer
