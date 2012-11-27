@@ -101,10 +101,11 @@ def twitter(irc, nick, userhost, target, cmd, args, what):
 			if m.group('status_id'):
 				k['in_reply_to'] = m.group('status_id')
 			if m.group('username'):
-				a = '@' + m.group('username') + ' ' + ' '.join(args)
+				a = '@' + m.group('username') + ' ' + ' '.join(args[1:])
 			elif args[1].startswith('@'):
-				a = ' '.join(args)
+				a = ' '.join(args[1:])
 			else:
+				# XXX das macht noch keinen Sinn, weil die Regex eh nur mit Username matcht
 				irc.notice(target, 'Entweder brauche ich eine URL mit nem Username, oder du musst den User selbst @-mentionen.')
 				return False
 		else:
