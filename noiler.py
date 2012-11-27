@@ -101,10 +101,11 @@ def twitter(irc, nick, userhost, target, cmd, args, what):
 			if m.group('status_id'):
 				k['in_reply_to'] = m.group('status_id')
 			if m.group('username'):
-				a = '@' + m.group('username') + ' ' + ' '.join(args)
+				a = '@' + m.group('username') + ' ' + ' '.join(args[1:])
 			elif args[1].startswith('@'):
-				a = ' '.join(args)
+				a = ' '.join(args[1:])
 			else:
+				# XXX das macht noch keinen Sinn, weil die Regex eh nur mit Username matcht
 				irc.notice(target, 'Entweder brauche ich eine URL mit nem Username, oder du musst den User selbst @-mentionen.')
 				return False
 		else:
@@ -300,10 +301,10 @@ def handle_privmsg(irc, nick, userhost, target, message):
 		m = re.match(r"(?:https?://(?:[^.]+.)?twitter.com/(?P<username>[^/]*)/status(?:es)?/)?(?P<status_id>\d+)", message)
 		if m:
 			try:
-				tweet = api.get_status(m.group(status_id))
+				tweet = api.get_status(m.group('status_id'))
 				irc.privmsg(target, u"Tweet von %s: %s" % (u'@' + tweet.user.screen_name, unicode(tweet.text)))
 			except Exception as e:
-				irc.notice(target, 'Das hat nicht geklappt: %s' % e.reason)
+				irc.notice(target, 'Das hat nicht geklappt: %s' % e)
 
 	return False
 
