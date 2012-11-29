@@ -217,6 +217,8 @@ def quote_show(irc, nick, userhost, target, cmd, args):
 		return True
 
 def time(irc, nick, userhost, target, cmd, args):
+	if not is_channel(target):
+		target = nick
 	irc.notice(target, datetime.now().strftime("%Y-%m-%d %H:%M"))
 	return True
 
