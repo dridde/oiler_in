@@ -217,6 +217,8 @@ def quote_show(irc, nick, userhost, target, cmd, args):
 		return True
 
 def time(irc, nick, userhost, target, cmd, args):
+	if not is_channel(target):
+		target = nick
 	irc.notice(target, datetime.now().strftime("%Y-%m-%d %H:%M"))
 	return True
 
@@ -302,7 +304,7 @@ def handle_privmsg(irc, nick, userhost, target, message):
 		if m:
 			try:
 				tweet = api.get_status(m.group('status_id'))
-				irc.notice(target, ("Tweet von @%s: %s" % (tweet.user.screen_name, tweet.text.replace('\n', ' '))).encode('utf-8'))
+				irc.notice(target, ("Tweet von @%s: %s" % (tweet.user.screen_name, unescape(tweet.text).replace('\n', ' '))).encode('utf-8'))
 			except Exception as e:
 				irc.notice(target, 'Das hat nicht geklappt: %s' % e)
 
@@ -353,9 +355,9 @@ def twitter_mentions_thread(api, irc):
 	while True:
 		try:
 			sleep(30)
-			for status in api.mentions():
-				if status.created_at > datetime.utcnow() - timedelta(minutes=1):
-					irc.notice(config.chan, "Tweet von @%s: %s" % (status.author.screen_name, unescape(status.text).encode('utf-8')))
+			for tweet in api.mentions():
+				if tweet.created_at > datetime.utcnow() - timedelta(seconds=30):
+					irc.notice(config.chan, ("Tweet von @%s: %s" % (tweet.user.screen_name, unescape(tweet.text).replace('\n', ' '))).encode('utf-8'))
 		except Exception, e:
 			print "!!! Exception in twitter_mentions_thread:"
 			print e
