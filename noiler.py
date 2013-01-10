@@ -100,9 +100,12 @@ def twitter(irc, nick, userhost, target, cmd, args, what):
 			sucess = 'Reply ist raus.'
 			if m.group('status_id'):
 				k['in_reply_to_status_id'] = m.group('status_id')
+				k['in_reply_to_status_id_str'] = m.group('status_id')
 			if m.group('username'):
+				k['in_reply_to_screen_name'] = m.group('username')
 				a = '@' + m.group('username') + ' ' + ' '.join(args[1:])
 			elif args[1].startswith('@'):
+				k['in_reply_to_screen_name'] = args[1]
 				a = ' '.join(args[1:])
 			else:
 				irc.notice(target, 'Entweder brauche ich eine URL mit nem Username, oder du musst den User selbst @-mentionen.')
